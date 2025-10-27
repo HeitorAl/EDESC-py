@@ -138,7 +138,7 @@ def train_EDESC():
         pretrain_ae(model.ae)
     else:
         # Load pre-trained model
-        model.pretrain(args.pretrain_path)
+        model.pretrain(model.pretrain_path)
 
     optimizer = Adam(model.parameters(), lr=args.lr)
 
@@ -188,8 +188,7 @@ def train_EDESC():
         if ari > arimax:
             arimax = ari
 
-        print('Iter {}'.format(epoch), ':Current Acc {:.4f}'.format(acc),
-              ':Max Acc {:.4f}'.format(accmax),', Current nmi {:.4f}'.format(nmi), ':Max nmi {:.4f}'.format(nmimax), ', Current ari {:.4f}'.format(ari), ':Max ari {:.4f}'.format(arimax))
+        print(f'Iter {epoch} :Current Acc {acc:.4f} :Max Acc {accmax:.4f} , Current nmi {nmi:.4f} :Max nmi {nmimax:.4f} , Current ari {ari:.4f} :Max ari {arimax:.4f}')
 
         ############## Total loss function ######################
         loss = model.total_loss(data, x_bar, z, pred=s, target=s_tilde, dim=args.d, n_clusters = args.n_clusters, beta = args.beta)
@@ -208,13 +207,13 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--n_clusters', default=4, type=int)
-    parser.add_argument('--d', default=5, type=int)
+    parser.add_argument('--d', default=3, type=int)
     parser.add_argument('--n_z', default=20, type=int)
-    parser.add_argument('--eta', default=5, type=int)
-    parser.add_argument('--dataset', type=str, default='reuters', 
+    parser.add_argument('--eta', default=3, type=int)
+    parser.add_argument('--dataset', type=str, default='reuters',
                         choices=['reuters', 'mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'stl10', 'ssfreg', 'ssf', 'pampa', 'cerrados'])
     parser.add_argument('--pretrain_path', type=str, default='')
-    parser.add_argument('--beta', default=0.1, type=float, help='coefficient of subspace affinity loss')
+    parser.add_argument('--beta', default=1, type=float, help='coefficient of subspace affinity loss')
     args = parser.parse_args()
     args.cuda = torch.cuda.is_available()
     print("use cuda: {}".format(args.cuda))
@@ -283,7 +282,6 @@ if __name__ == "__main__":
         args.num_sample = 33543
 
     dataset = LoadDataset(args.dataset)
-    print(args)
 
     bestacc = 0
     bestnmi = 0
@@ -297,4 +295,4 @@ if __name__ == "__main__":
         if ari > bestari:
             bestari = ari
 
-    print('Best ACC {:.4f}'.format(bestacc), ' Best NMI {:4f}'.format(bestnmi), ' Best ARI {:4f}'.format(bestari))
+    print(f'Best ACC {bestacc:.4f}  Best NMI {bestnmi:.4f}  Best ARI {bestari:.4f}')
