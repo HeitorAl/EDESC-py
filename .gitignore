@@ -1,0 +1,6 @@
+data/cifar10
+data/cifar100
+data/mnist
+cifar10.pkl
+cifar100.pkl
+mnist.pkl
