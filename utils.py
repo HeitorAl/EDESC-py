@@ -14,19 +14,7 @@ from sklearn import preprocessing
 import numpy as np
 import os
 import pickle
-from keras.applications.resnet50 import ResNet50, preprocess_input
-from keras.preprocessing.image import img_to_array, array_to_img
-from keras.models import Model
-from keras.datasets import cifar10, cifar100, mnist, fashion_mnist
-from keras.utils import to_categorical
 import tensorflow as tf
-
-def preprocess_and_extract(model, images):
-    # Redimensionar para 224x224 e aplicar preprocess_input
-    resized_images = tf.image.resize(images, [224, 224])
-    preprocessed = preprocess_input(resized_images)
-    features = model.predict(preprocessed, batch_size=64, verbose=1)
-    return features
 
 def load_reuters_data(path='./data/reuters'):
     import os
@@ -45,16 +33,23 @@ def load_reuters_data(path='./data/reuters'):
 
 def load_mnist(dataset='mnist'):
     if dataset == 'mnist':
-        (x_train, y_train), (x_test, y_test) = mnist.load_data()
+        train = datasets.MNIST('./data/mnist', train=True, download=True)
+        test = datasets.MNIST('./data/mnist', train=False, download=True)
     elif dataset == 'fashion_mnist':
-        (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+        train = datasets.FashionMNIST('./data/fmnist', train=True, download=True)
+        test = datasets.FashionMNIST('./data/fmnist', train=False, download=True)
+
+    x_train, y_train = train.data.numpy(), train.targets.numpy()
+    x_test, y_test = test.data.numpy(), test.targets.numpy()
 
     x = np.concatenate((x_train, x_test))
     y = np.concatenate((y_train, y_test))
-    x = x.reshape((x.shape[0], -1))
-    x = np.divide(x, 255.)
 
-    return x.astype(np.float32), y.astype(np.int32)
+    x = x.reshape((x.shape[0], -1)).astype('float32') / 255.0
+    y = y.astype('int64')
+
+    print((dataset.upper(), 'samples', x.shape))
+    return x, y
 
 def load_cifar10(path='./data/cifar10'):
     transform = transforms.Compose([
