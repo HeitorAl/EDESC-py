@@ -207,9 +207,9 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--n_clusters', default=4, type=int)
-    parser.add_argument('--d', default=3, type=int)
+    parser.add_argument('--d', default=2, type=int)
     parser.add_argument('--n_z', default=20, type=int)
-    parser.add_argument('--eta', default=3, type=int)
+    parser.add_argument('--eta', default=2, type=int)
     parser.add_argument('--dataset', type=str, default='reuters',
                         choices=['reuters', 'mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'stl10', 'ssfreg', 'ssf', 'pampa', 'cerrados'])
     parser.add_argument('--pretrain_path', type=str, default='')

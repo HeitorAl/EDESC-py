@@ -17,7 +17,7 @@ def seperate(Z, y_pred, n_clusters):
 def Initialization_D(Z, y_pred, n_clusters, d):
     Z_seperate = seperate(Z, y_pred, n_clusters)
     Z_full = None
-    U = np.zeros([Z.shape[1], n_clusters * d])
+    U = np.zeros([n_clusters * d, n_clusters * d])
     print("Initialize D")
     for i in range(n_clusters):
         Z_seperate[i] = np.array(Z_seperate[i])

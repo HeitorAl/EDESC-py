@@ -48,6 +48,8 @@ def load_mnist(dataset='mnist'):
     x = x.reshape((x.shape[0], -1)).astype('float32') / 255.0
     y = y.astype('int64')
 
+    x -= x.mean(axis=0)
+
     print((dataset.upper(), 'samples', x.shape))
     return x, y
 
