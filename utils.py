@@ -1,13 +1,14 @@
 from __future__ import division, print_function
 
+import re
 import numpy as np
-from pickleshare import pickle
 import torch
-from torch.utils.data import Dataset, dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision import datasets, transforms, models
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
 from sklearn.metrics import adjusted_rand_score as ari_score
+from sklearn.preprocessing import RobustScaler
 import h5py
 import scipy.io
 from sklearn import preprocessing
@@ -15,14 +16,20 @@ import numpy as np
 import os
 import pickle
 import tensorflow as tf
+import pandas as pd
+
+# --- FUNÇÃO DE TEMPLATE (COM PEQUENAS MELHORIAS) ---
 
 def load_reuters_data(path='./data/reuters'):
     import os
-    if not os.path.exists(os.path.join(path, 'reutersidf10k.npy')):
-        print('making reuters idf features')
-        # make_reuters_data(data_path)
-        print(('reutersidf saved to ' + path))
-    data = np.load(os.path.join(path, 'reutersidf10k.npy'),allow_pickle=True).item()
+    file_path = os.path.join(path, 'reutersidf10k.npy')
+    
+    if not os.path.exists(file_path):
+        print('Arquivo reutersidf10k.npy não encontrado.')
+        print('Por favor, gere o arquivo primeiro ou verifique o caminho.')
+        raise FileNotFoundError(f"Arquivo de features não encontrado em {file_path}")
+        
+    data = np.load(file_path, allow_pickle=True).item()
     # has been shuffled
     x = data['data']
     y = data['label']
@@ -31,187 +38,225 @@ def load_reuters_data(path='./data/reuters'):
     print(('REUTERSIDF10K samples', x.shape))
     return x, y
 
-def load_mnist(dataset='mnist'):
+# --- FUNÇÕES DE IMAGEM (FLAT) REATORADAS ---
+
+def load_mnist(dataset='mnist', path=None):
     if dataset == 'mnist':
-        train = datasets.MNIST('./data/mnist', train=True, download=True)
-        test = datasets.MNIST('./data/mnist', train=False, download=True)
+        data_path = path if path is not None else './data/mnist'
+        file_name = 'mnist_features.npy'
     elif dataset == 'fashion_mnist':
-        train = datasets.FashionMNIST('./data/fmnist', train=True, download=True)
-        test = datasets.FashionMNIST('./data/fmnist', train=False, download=True)
+        data_path = path if path is not None else './data/fmnist'
+        file_name = 'fashion_mnist_features.npy'
+    else:
+        raise ValueError("Dataset não suportado (apenas mnist ou fashion_mnist)")
 
-    x_train, y_train = train.data.numpy(), train.targets.numpy()
-    x_test, y_test = test.data.numpy(), test.targets.numpy()
+    file_path = os.path.join(data_path, file_name)
 
-    x = np.concatenate((x_train, x_test))
-    y = np.concatenate((y_train, y_test))
+    if not os.path.exists(file_path):
+        print(f"Criando features {dataset}... Isso é executado apenas uma vez.")
+        os.makedirs(data_path, exist_ok=True)
+        
+        if dataset == 'mnist':
+            train = datasets.MNIST(data_path, train=True, download=True)
+            test = datasets.MNIST(data_path, train=False, download=True)
+        elif dataset == 'fashion_mnist':
+            train = datasets.FashionMNIST(data_path, train=True, download=True)
+            test = datasets.FashionMNIST(data_path, train=False, download=True)
 
-    x = x.reshape((x.shape[0], -1)).astype('float32') / 255.0
-    y = y.astype('int64')
+        x_train, y_train = train.data.numpy(), train.targets.numpy()
+        x_test, y_test = test.data.numpy(), test.targets.numpy()
 
-    x -= x.mean(axis=0)
+        x = np.concatenate((x_train, x_test))
+        y = np.concatenate((y_train, y_test))
 
+        x = x.reshape((x.shape[0], -1)).astype('float32') / 255.0
+        y = y.astype('int64')
+
+        x -= x.mean(axis=0)  # Centralização
+        
+        data = {'data': x, 'label': y}
+        np.save(file_path, data)
+        print(f"Features {dataset} salvas em {file_path}")
+
+    data = np.load(file_path, allow_pickle=True).item()
+    x = data['data']
+    y = data['label']
+    
     print((dataset.upper(), 'samples', x.shape))
     return x, y
 
-def load_cifar10(path='./data/cifar10'):
+# --- FUNÇÕES DE IMAGEM (RESNET) REATORADAS ---
+
+@torch.no_grad()
+def _create_image_features(dataset_name, root_path, file_path):
+    print(f"Criando features {dataset_name}... Isso pode demorar um pouco.")
+    os.makedirs(root_path, exist_ok=True)
+
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+
     transform = transforms.Compose([
-        transforms.Resize(224),  # redimensiona
-        transforms.ToTensor(),   # converte para tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std)
     ])
 
-    train_set = datasets.CIFAR10(root=path, train=True, download=True, transform=transform)
-    test_set = datasets.CIFAR10(root=path, train=False, download=True, transform=transform)
+    if dataset_name == 'CIFAR10':
+        train_set = datasets.CIFAR10(root=root_path, train=True, download=True, transform=transform)
+        test_set = datasets.CIFAR10(root=root_path, train=False, download=True, transform=transform)
+    elif dataset_name == 'CIFAR100':
+        train_set = datasets.CIFAR100(root=root_path, train=True, download=True, transform=transform)
+        test_set = datasets.CIFAR100(root=root_path, train=False, download=True, transform=transform)
+    elif dataset_name == 'STL10':
+        train_set = datasets.STL10(root=root_path, split='train', download=True, transform=transform)
+        test_set = datasets.STL10(root=root_path, split='test', download=True, transform=transform)
+    else:
+        raise ValueError(f"Dataset {dataset_name} não suportado por esta função.")
 
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
+    train_loader = DataLoader(train_set, batch_size=256, shuffle=False, num_workers=4)
+    test_loader = DataLoader(test_set, batch_size=256, shuffle=False, num_workers=4)
 
-    model = models.resnet50(weights='IMAGENET1K_V1')
-    model = torch.nn.Sequential(*list(model.children())[:-1])  # remove a última camada (classificação)
+    model = models.resnet50(weights='DEFAULT')
+    model.fc = torch.nn.Identity()
     model.eval()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    x = []
-    y = []
 
-    with torch.no_grad():
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
+    img_list = []
+    label_list = []
 
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
+    for inputs, labels in train_loader:
+        inputs = inputs.to(device)
+        outputs = model(inputs)
+        img_list.append(outputs.cpu())
+        label_list.append(labels.cpu())
 
-    x = np.concatenate(x)
-    y = np.concatenate(y)
+    for inputs, labels in test_loader:
+        inputs = inputs.to(device)
+        outputs = model(inputs)
+        img_list.append(outputs.cpu())
+        label_list.append(labels.cpu())
 
+    x = torch.cat(img_list, dim=0).numpy()
+    y = torch.cat(label_list, dim=0).numpy()
+
+    data = {'data': x, 'label': y}
+    np.save(file_path, data)
+    print(f"Features {dataset_name} salvas em {file_path}")
+
+def load_cifar10(path='./data/cifar10'):
+    file_path = os.path.join(path, 'cifar10_features.npy')
+    if not os.path.exists(file_path):
+        _create_image_features('CIFAR10', path, file_path)
+    data = np.load(file_path, allow_pickle=True).item()
+    x, y = data['data'], data['label']
+    print(('CIFAR10 samples', x.shape))
     return x, y
 
 def load_cifar100(path='./data/cifar100'):
-    transform = transforms.Compose([
-        transforms.Resize(224),  # redimensiona
-        transforms.ToTensor(),   # converte para tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
-    ])
-
-    train_set = datasets.CIFAR100(root=path, train=True, download=True, transform=transform)
-    test_set = datasets.CIFAR100(root=path, train=False, download=True, transform=transform)
-
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
-
-    model = models.resnet50(weights='IMAGENET1K_V1')
-    model = torch.nn.Sequential(*list(model.children())[:-1])  # remove a última camada (classificação)
-    model.eval()
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    x = []
-    y = []
-
-    with torch.no_grad():
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
-
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
-
-    x = np.concatenate(x)
-    y = np.concatenate(y)
-
+    file_path = os.path.join(path, 'cifar100_features.npy')
+    if not os.path.exists(file_path):
+        _create_image_features('CIFAR100', path, file_path)
+    data = np.load(file_path, allow_pickle=True).item()
+    x, y = data['data'], data['label']
+    print(('CIFAR100 samples', x.shape))
     return x, y
 
 def load_stl10(path='./data/stl10'):
-    transform = transforms.Compose([
-        transforms.Resize(224),  # redimensiona
-        transforms.ToTensor(),   # converte para tensor
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
-    ])
-
-    train_set = datasets.STL10(root=path, train=True, download=True, transform=transform)
-    test_set = datasets.STL10(root=path, train=False, download=True, transform=transform)
-
-    train_loader = DataLoader(train_set, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
-
-    model = models.resnet50(weights='IMAGENET1K_V1')
-    model = torch.nn.Sequential(*list(model.children())[:-1])  # remove a última camada (classificação)
-    model.eval()
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.to(device)
-    x = []
-    y = []
-
-    with torch.no_grad():
-        for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
-
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            outputs = outputs.view(outputs.size(0), -1)  # achata a saída
-            x.append(outputs.cpu().numpy())
-            y.append(labels.numpy())
-
-    x = np.concatenate(x)
-    y = np.concatenate(y)
-
+    file_path = os.path.join(path, 'stl10_features.npy')
+    if not os.path.exists(file_path):
+        _create_image_features('STL10', path, file_path)
+    data = np.load(file_path, allow_pickle=True).item()
+    x, y = data['data'], data['label']
+    print(('STL10 samples', x.shape))
     return x, y
 
-def load_csv(datapath='./data/bases', filename='ssf_wide_indices_3000_4_Oct_2025.csv'):
-    import pandas as pd
-    import os
 
-    file_path = os.path.join(datapath, filename)
+# --- CARREGAMENTO DOS DATASETS DE SENSORIAMENTO REMOTO ---
+#
+#   'sentinel': B02.01, B8A.01, NDVI.01, EVI.01, ...
+#   'modis':    ndvi01, evi01, nir01, mir01, ...
+#
+# Normalização: uma fração relevante dos valores brutos não é fisicamente
+# plausível (~1e14-1e15, sem NaN -- confirmado que são os dados reais
+# disponíveis, não corrigíveis nesta ponta). Para não deixar esses valores
+# dominarem a escala: winsoriza cada coluna ao percentil [1, 99], depois
+# RobustScaler (mediana/IQR, pouco sensível a outliers restantes -- um
+# MinMaxScaler aqui esmagaria quase toda a informação real numa faixa
+# estreitíssima, já que o range bruto da coluna é ~1e15), e por fim clip
+# em [-10, 10] reescalado para [0, 1].
+MODIS_FEATURE_RE = re.compile(r'^(ndvi|evi|nir|mir)\d{2}$', re.IGNORECASE)
+SENTINEL_FEATURE_RE = re.compile(r'^(B\d{2}|B8A|NDVI|EVI)\.\d+$')
+EXTREME_THRESHOLD = 1e5
+CLIP_LOW_Q, CLIP_HIGH_Q = 0.01, 0.99
+POST_SCALE_CLIP = 10.0
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File {file_path} not found.")
-    
-    data = pd.read_csv(file_path)
+REMOTE_SENSING_FILES = {
+    'ssf':               ('ssf.sentinel.raw.xlsx', 'sentinel'),
+    'ssf_filtered':      ('ssf.sentinel.filtered.xlsx', 'sentinel'),
+    'pampa':             ('pampa.sentinel.raw.xlsx', 'sentinel'),
+    'pampa_filtered':    ('pampa.sentinel.filtered.xlsx', 'sentinel'),
+    'cerrado_modis':     ('cerrado.i.modis.raw.xlsx', 'modis'),
+    'cerrado_filtered':  ('cerrado.i.modis.filtered.xlsx', 'modis'),
+    'cerrado_sentinel':  ('cerrado.ii.sentinel.raw.xlsx', 'sentinel'),
+}
 
-    feature_cols = [
-        c for c in data.columns
-        if any(prefix in c for prefix in ['B', 'NDVI', 'EVI'])
-    ]
 
-    label_col = 'label'
+def load_csv(dataset_name, datapath='./data/bases'):
+    filename, family = REMOTE_SENSING_FILES[dataset_name]
+    csv_file_path = os.path.join(datapath, filename)
+    npy_file_path = os.path.join(datapath, os.path.splitext(filename)[0] + '_features.npy')
 
-    if label_col not in data.columns:
-        raise ValueError(f"Label column '{label_col}' not found in the dataset.")
-    
-    y = data[label_col].astype('category').cat.codes.values
-    x = data[feature_cols].astype(np.float32)
-    x = x.fillna(x.mean()).values
-    x = np.clip(x, -1, 1)
+    if not os.path.exists(npy_file_path):
+        print(f"Processando {filename} e salvando features... Isso é executado apenas uma vez.")
+        os.makedirs(datapath, exist_ok=True)
 
-    print(f"Loaded {x.shape[0]} samples with {x.shape[1]} features and {len(np.unique(y))} classes from {filename}")
-    print('Classes:', dict(enumerate(data[label_col].astype('category').cat.categories)))
+        if not os.path.exists(csv_file_path):
+            raise FileNotFoundError(f"Arquivo {csv_file_path} não encontrado.")
 
-    return x.astype(np.float32), y.astype(np.int32)
+        data = pd.read_excel(csv_file_path) if csv_file_path.lower().endswith(('.xlsx', '.xls')) \
+            else pd.read_csv(csv_file_path)
+
+        regex = MODIS_FEATURE_RE if family == 'modis' else SENTINEL_FEATURE_RE
+        feature_cols = [c for c in data.columns if regex.match(str(c))]
+
+        label_col = 'label'
+        if label_col not in data.columns:
+            raise ValueError(f"Coluna '{label_col}' não encontrada no dataset.")
+
+        y_codes = data[label_col].astype('category').cat.codes.values
+        y_cats = dict(enumerate(data[label_col].astype('category').cat.categories))
+
+        x_raw = data[feature_cols].astype(np.float64)
+
+        extreme_frac = float((x_raw.abs() > EXTREME_THRESHOLD).values.mean())
+        print(f"[{dataset_name}] {len(feature_cols)} feature cols | "
+              f"{extreme_frac * 100:.2f}% das células além de uma faixa física plausível "
+              f"(|x|>{EXTREME_THRESHOLD:.0e}) antes da limpeza.")
+        if extreme_frac > 0.5:
+            print(f"  AVISO: mais da metade de '{dataset_name}' é dominada por esses valores "
+                  f"implausíveis o sinal normalizado tende a ser majoritariamente ruído.")
+
+        lower = x_raw.quantile(CLIP_LOW_Q)
+        upper = x_raw.quantile(CLIP_HIGH_Q)
+        x_clipped = x_raw.clip(lower=lower, upper=upper, axis=1)
+        x_clipped = x_clipped.fillna(x_clipped.mean())
+
+        x_scaled = RobustScaler().fit_transform(x_clipped)
+        x_scaled = np.clip(x_scaled, -POST_SCALE_CLIP, POST_SCALE_CLIP)
+        x_scaled = (x_scaled + POST_SCALE_CLIP) / (2 * POST_SCALE_CLIP)  # -> [0, 1]
+
+        save_data = {'data': x_scaled.astype(np.float32), 'label': y_codes.astype(np.int32),
+                     'classes': y_cats, 'extreme_fraction': extreme_frac}
+        np.save(npy_file_path, save_data)
+        print(f"Features salvas em {npy_file_path}")
+
+    data = np.load(npy_file_path, allow_pickle=True).item()
+    x, y = data['data'], data['label']
+    print(f"Carregado {x.shape[0]} amostras com {x.shape[1]} features e {len(np.unique(y))} "
+          f"classes (extreme_fraction={data.get('extreme_fraction', float('nan')):.2%})")
+    return x, y
+
 
 class LoadDataset(Dataset):
     def __init__(self, dataset_name):
@@ -220,23 +265,17 @@ class LoadDataset(Dataset):
         if self.dataset_name == 'reuters':
             self.x, self.y = load_reuters_data()
         elif self.dataset_name == 'mnist':
-            self.x, self.y = load_mnist(dataset='mnist')
+            self.x, self.y = load_mnist(dataset='mnist', path='./data/mnist')
         elif self.dataset_name == 'fashion_mnist':
-            self.x, self.y = load_mnist(dataset='fashion_mnist')
+            self.x, self.y = load_mnist(dataset='fashion_mnist', path='./data/fmnist')
         elif self.dataset_name == 'cifar10':
             self.x, self.y = load_cifar10()
         elif self.dataset_name == 'cifar100':
             self.x, self.y = load_cifar100()
         elif self.dataset_name == 'stl10':
             self.x, self.y = load_stl10()
-        elif self.dataset_name == 'ssfreg':
-            self.x, self.y = load_csv(filename='ssf_wide_indices_3000_reg_4_Oct_2025.csv')
-        elif self.dataset_name == 'ssf':
-            self.x, self.y = load_csv(filename='ssf_wide_indices_3000_4_Oct_2025.csv')
-        elif self.dataset_name == 'pampa':
-            self.x, self.y = load_csv(filename='pampa_wide_indices_4_Oct_2025.csv')
-        elif self.dataset_name == 'cerrados':
-           self.x, self.y = load_csv(filename='cerrados_wide_indices_4_Oct_2025.csv')
+        elif self.dataset_name in REMOTE_SENSING_FILES:
+            self.x, self.y = load_csv(self.dataset_name)
         else:
             raise ValueError(f"Dataset {dataset_name} not supported")
 
@@ -247,6 +286,8 @@ class LoadDataset(Dataset):
         return torch.from_numpy(np.array(self.x[idx])), \
                torch.from_numpy(np.array(self.y[idx])), \
                torch.from_numpy(np.array(idx))
+
+# --- FUNÇÕES DE MÉTRICA (INALTERADAS) ---
 
 def cluster_acc(y_true, y_pred):
     from scipy.optimize import linear_sum_assignment

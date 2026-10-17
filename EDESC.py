@@ -256,30 +256,48 @@ if __name__ == "__main__":
         args.n_clusters = 10
         args.n_input = 3*96*96
         args.num_sample = 13000
-    elif args.dataset == 'ssfreg':
+    elif args.dataset == 'ssf_filtered':
         if not args.pretrain_path:
-            args.pretrain_path = 'data/ssf_reg.pkl'
+            args.pretrain_path = 'data/EDESC/ssf_filtered/ssf_filtered.npz'
         args.n_clusters = 8
-        args.n_input = 27
-        args.num_sample = 3000
+        args.n_input = 279
+        args.num_sample = 8763
     elif args.dataset == 'ssf':
         if not args.pretrain_path:
-            args.pretrain_path = 'data/ssf.pkl'
+            args.pretrain_path = 'data/EDESC/ssf/ssf.npz'
         args.n_clusters = 8
-        args.n_input = 95
-        args.num_sample = 3000
+        args.n_input = 279
+        args.num_sample = 10000
     elif args.dataset == 'pampa':
         if not args.pretrain_path:
-            args.pretrain_path = 'data/pampa.pkl'
+            args.pretrain_path = 'data/EDESC/pampa/pampa.npz'
         args.n_clusters = 9
-        args.n_input = 138
+        args.n_input = 184
         args.num_sample = 6746
-    elif args.dataset == 'cerrados':
+    elif args.dataset == 'pampa_filtered':
         if not args.pretrain_path:
-            args.pretrain_path = 'data/cerrados.pkl'
+            args.pretrain_path = 'data/EDESC/pampa_filtered/pampa_filtered.npz'
+        args.n_clusters = 9
+        args.n_input = 184
+        args.num_sample = 5886
+    elif args.dataset == 'cerrado_sentinel':
+        if not args.pretrain_path:
+            args.pretrain_path = 'data/EDESC/cerrado_sentinel/cerrado_sentinel.npz'
         args.n_clusters = 5
-        args.n_input = 260
-        args.num_sample = 33543
+        args.n_input = 286
+        args.num_sample = 33544
+    elif args.dataset == 'cerrado_modis':
+        if not args.pretrain_path:
+            args.pretrain_path = 'data/EDESC/cerrado_modis/cerrado_modis.npz'
+        args.n_clusters = 12
+        args.n_input = 92
+        args.num_sample = 50160
+    elif args.dataset == 'cerrado_filtered':
+        if not args.pretrain_path:
+            args.pretrain_path = 'data/EDESC/cerrado_filtered/cerrado_filtered.npz'
+        args.n_clusters = 12
+        args.n_input = 92
+        args.num_sample = 43910
 
     dataset = LoadDataset(args.dataset)
 
