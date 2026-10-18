@@ -211,7 +211,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_z', default=20, type=int)
     parser.add_argument('--eta', default=2, type=int)
     parser.add_argument('--dataset', type=str, default='reuters',
-                        choices=['reuters', 'mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'stl10', 'ssfreg', 'ssf', 'pampa', 'cerrados'])
+                        choices=['reuters', 'mnist', 'fashion_mnist', 'cifar10', 'cifar100', 'stl10', 'ssf_filtered', 'ssf', 'pampa', 'pampa_filtered', 'cerrado_filtered', 'cerrado_modis', 'cerrado_sentinel'])
     parser.add_argument('--pretrain_path', type=str, default='')
     parser.add_argument('--beta', default=1, type=float, help='coefficient of subspace affinity loss')
     args = parser.parse_args()
@@ -254,7 +254,7 @@ if __name__ == "__main__":
         if not args.pretrain_path:
             args.pretrain_path = 'data/stl10.pkl'
         args.n_clusters = 10
-        args.n_input = 3*96*96
+        args.n_input = 2048
         args.num_sample = 13000
     elif args.dataset == 'ssf_filtered':
         if not args.pretrain_path:
