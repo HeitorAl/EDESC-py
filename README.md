@@ -26,7 +26,7 @@ O repositório inclui o pipeline para bases de sensoriamento remoto agrícola (S
 
 - Python 3.9+
 - Pacotes: `torch`, `torchvision`, `numpy`, `scipy`, `scikit-learn`, `pandas`, `openpyxl` (leitura dos `.xlsx`), `h5py`
-- `tensorflow`/`keras`: os scripts importam `tensorflow` e `keras.backend`, mas **não os utilizam**. Instale-os ou remova essas linhas (ver [Problemas comuns](#problemas-comuns)).
+- `tensorflow`/`keras`: os scripts importam `tensorflow` e `keras.backend`, mas **não os utilizam**.
 - GPU é opcional (`torch.cuda.is_available()` é detectado automaticamente). O `EDESC.py` e o `EDESC-SS.py` carregam a base inteira no dispositivo.
 
 ```bash
