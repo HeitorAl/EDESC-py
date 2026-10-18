@@ -1,0 +1,11 @@
+torch
+numpy
+pandas
+scikit-learn
+pickle
+tensorflow
+torchvision
+keras
+scipy
+h5py
+openpyxl

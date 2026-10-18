@@ -259,7 +259,7 @@ def load_csv(dataset_name, datapath='./data/bases'):
 
 
 class LoadDataset(Dataset):
-    def __init__(self, dataset_name):
+    def __init__(self, dataset_name, datapath='./data/bases'):
         self.dataset_name = dataset_name.lower()
 
         if self.dataset_name == 'reuters':
@@ -275,7 +275,7 @@ class LoadDataset(Dataset):
         elif self.dataset_name == 'stl10':
             self.x, self.y = load_stl10()
         elif self.dataset_name in REMOTE_SENSING_FILES:
-            self.x, self.y = load_csv(self.dataset_name)
+            self.x, self.y = load_csv(self.dataset_name, datapath=datapath)
         else:
             raise ValueError(f"Dataset {dataset_name} not supported")
 

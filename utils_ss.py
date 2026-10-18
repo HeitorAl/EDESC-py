@@ -244,7 +244,7 @@ def load_csv(dataset_name, datapath='./data/bases'):
 
 
 class LoadDataset(Dataset):
-    def __init__(self, dataset_name, labeled_ratio=0.05, eval_ratio=0.02, seed=42):
+    def __init__(self, dataset_name, labeled_ratio=0.05, eval_ratio=0.02, seed=42, datapath='./data/bases'):
         """
         labeled_ratio: fração das amostras que manterão rótulo
                        (ex: 0.1 = 10% rotuladas)
@@ -264,7 +264,7 @@ class LoadDataset(Dataset):
         elif self.dataset_name == 'stl10':
             self.x, self.y = load_stl10()
         elif self.dataset_name in REMOTE_SENSING_FILES:
-            self.x, self.y = load_csv(self.dataset_name)
+            self.x, self.y = load_csv(self.dataset_name, datapath=datapath)
         else:
             raise ValueError(f"Dataset {dataset_name} not supported")
 
