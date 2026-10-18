@@ -14,8 +14,6 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.nn import Linear
 from utils_ss import LoadDataset, cluster_acc
-import tensorflow as tf
-import keras.backend as K
 import warnings
 from AutoEncoder import AE
 from InitializeD import Initialization_D
