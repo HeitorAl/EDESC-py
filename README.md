@@ -33,8 +33,15 @@ O repositório inclui o pipeline para bases de sensoriamento remoto agrícola (S
 git clone https://github.com/HeitorAl/EDESC-py.git
 cd EDESC-py
 python -m venv .venv && source .venv/bin/activate
-pip install torch torchvision numpy scipy scikit-learn pandas openpyxl h5py
+pip install -r requirements.txt
 ```
+
+```bash
+!git clone https://github.com/HeitorAl/EDESC-py.git
+%cd EDESC-py
+!pip install -r requirements.txt
+```
+
 
 ---
 
